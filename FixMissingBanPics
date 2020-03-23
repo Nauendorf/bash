@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Find missing Ban picture
+while read file
+do echo $file >> ./pictures.txt
+done < <(echo "select document_picture, recorded_picture, full_document_picture from ban_pictures;" | mysql -N -u root --password=f1r3sc4n scantek_client)
+
+# Check which images in the complete list do not exist on the filesystem
+for i in $(awk {'print $5 " " $1'} pictures.txt);
+do
+    if [ ! -e /var/www/images/recorded/$i ]
+    then
+        echo $i >> ./missingBanPictures.txt
+    fi
+done
+rm ./pictures.txt
+
+# For each db image that does not exist in the filesystem, grab it with wget
+if [ -e /var/www/includes/missingBanPictures.txt ]
+then
+    for i in `cat ./missingBanPictures.txt`; do wget --tries=3 -O /var/www/images/recorded/$i http://192.168.15.241/images/recorded/$i -T 1; done
+    rm ./missingBanPictures
+    echo "[ $(date) ]  Ban images successfully updated" >> /var/log/scantek/FixMissingBanPics.log
+else
+    echo "[ $(date) ]  No missing ban images" >> /var/log/scantek/FixMissingBanPics.log
+fi
